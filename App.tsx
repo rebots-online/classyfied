@@ -51,7 +51,7 @@ export default function App() {
   const [contentBasis, setContentBasis] = useState<ContentBasis | null>(null);
   const [inputProcessing, setInputProcessing] = useState(false); // Combines urlValidating and initial part of contentLoading
   const [contentLoading, setContentLoading] = useState(false); // Specifically for LLM generation phase
-  const [isOutputExpanded, setIsOutputExpanded] = useState(false); 
+  // Removed isOutputExpanded state - using full width layout by default 
 
   const contentContainerRef = useRef<{
     getSpec: () => string;
@@ -59,7 +59,12 @@ export default function App() {
   } | null>(null);
 
   const [reloadCounter, setReloadCounter] = useState(0);
+  const [inputValue, setInputValue] = useState(localStorage.getItem('lastInput') || '');
   const contentInputRef = useRef<HTMLTextAreaElement>(null); // Single input ref
+
+  useEffect(() => {
+    localStorage.setItem('lastInput', inputValue);
+  }, [inputValue]);
 
   const [llmInteractions, setLlmInteractions] = useState<LlmInteraction[]>([]);
   const [showLlmLogPanel, setShowLlmLogPanel] = useState(true); 
@@ -96,9 +101,7 @@ export default function App() {
     setShowHowToUseModal(prev => !prev);
   };
 
-  const handleToggleExpandOutput = () => {
-    setIsOutputExpanded(prev => !prev);
-  };
+  // Removed handleToggleExpandOutput - using full width layout by default
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey && !inputProcessing && !contentLoading) {
@@ -179,14 +182,14 @@ export default function App() {
     <>
       <div className="app-wrapper">
         <Header 
-          siteTitle="Video to Learning App"
+          siteTitle="Of Course!"
           subTitle="Generate interactive learning apps from YouTube content or topics"
           showLlmLogPanel={showLlmLogPanel}
           onToggleLlmLogPanel={handleToggleLlmLogPanel}
           onToggleHowToUse={toggleHowToUseModal}
         />
         <div className="content-pusher">
-          <main className={`main-container ${isOutputExpanded ? 'output-expanded' : ''}`}>
+          <main className="main-container">
             <div className="left-side">
               <div className="input-section">
                 <div className="input-container">
@@ -196,31 +199,17 @@ export default function App() {
                   <textarea
                     ref={contentInputRef}
                     id="content-input"
-                    className="content-input" // New class for combined input
-                    rows={4} // Adjusted rows
+                    className="content-input"
+                    rows={4}
                     placeholder="e.g., 'https://www.youtube.com/watch?v=xyz' or 'Quantum physics for beginners' or combine both!"
                     disabled={isFormDisabled}
                     onKeyDown={handleKeyDown}
-                    onChange={() => {
+                    value={inputValue}
+                    onChange={(e) => {
+                      setInputValue(e.target.value);
                       setContentBasis(null);
                     }}
                   />
-                </div>
-
-                <div className="educational-materials-request">
-                  <h4>Additional Materials (Optional):</h4>
-                  <div>
-                    <input type="checkbox" id="lessonPlan" name="lessonPlan" className="educational-material-checkbox" onChange={handleMaterialRequestChange} disabled={isFormDisabled} />
-                    <label htmlFor="lessonPlan">Lesson Plan</label>
-                  </div>
-                  <div>
-                    <input type="checkbox" id="handout" name="handout" className="educational-material-checkbox" onChange={handleMaterialRequestChange} disabled={isFormDisabled} />
-                    <label htmlFor="handout">Student Handout</label>
-                  </div>
-                  <div>
-                    <input type="checkbox" id="quiz" name="quiz" className="educational-material-checkbox" onChange={handleMaterialRequestChange} disabled={isFormDisabled} />
-                    <label htmlFor="quiz">Review Quiz</label>
-                  </div>
                 </div>
 
                 <div className="button-container">
@@ -248,26 +237,27 @@ export default function App() {
                 ) : contentBasis?.topicOrDetails && !contentBasis?.videoUrl ? (
                     <div className="video-placeholder">Generating app from topic: "{contentBasis.topicOrDetails.substring(0,60)}{contentBasis.topicOrDetails.length > 60 ? '...' : ''}"</div>
                 ) : (
-                  <div className="video-placeholder">Video appears here if URL is provided</div>
+                  <div className="educational-materials-request">
+                    <h4>Additional Materials (Optional):</h4>
+                    <div>
+                      <input type="checkbox" id="lessonPlan" name="lessonPlan" className="educational-material-checkbox" onChange={handleMaterialRequestChange} disabled={isFormDisabled} />
+                      <label htmlFor="lessonPlan">Lesson Plan</label>
+                    </div>
+                    <div>
+                      <input type="checkbox" id="handout" name="handout" className="educational-material-checkbox" onChange={handleMaterialRequestChange} disabled={isFormDisabled} />
+                      <label htmlFor="handout">Student Handout</label>
+                    </div>
+                    <div>
+                      <input type="checkbox" id="quiz" name="quiz" className="educational-material-checkbox" onChange={handleMaterialRequestChange} disabled={isFormDisabled} />
+                      <label htmlFor="quiz">Review Quiz</label>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
 
             <div className={`right-side ${showLlmLogPanel ? 'llm-log-visible' : ''}`}>
-              <div className="content-area-header">
-                 {contentBasis && (
-                   <button
-                    onClick={handleToggleExpandOutput}
-                    className="button-secondary expand-toggle-button"
-                    title={isOutputExpanded ? "Collapse Output" : "Expand Output"}
-                    aria-pressed={isOutputExpanded}
-                  >
-                    <span className="material-symbols-outlined">
-                      {isOutputExpanded ? 'contract_content' : 'expand_content'}
-                    </span>
-                  </button>
-                 )}
-              </div>
+              {/* Removed expand toggle button - using full width layout by default */}
               <div className="content-area">
                 {contentBasis ? (
                   <ContentContainer
@@ -277,7 +267,6 @@ export default function App() {
                     onLlmInteraction={handleLlmInteraction}
                     requestedMaterials={requestedMaterials}
                     ref={contentContainerRef}
-                    isOutputExpanded={isOutputExpanded}
                   />
                 ) : (
                   <div className="content-placeholder">
@@ -293,14 +282,13 @@ export default function App() {
                 <LlmLogPanel
                   interactions={llmInteractions}
                   onClearLog={handleClearLlmLog}
-                  isOutputExpanded={isOutputExpanded}
                 />
               )}
             </div>
           </main>
         </div>
         <Footer 
-          attributionText="An experiment by <strong>Robin L. M. Cheung, MBA</strong>"
+          attributionText=""
         />
       </div>
       {showHowToUseModal && (

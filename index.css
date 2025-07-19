@@ -162,61 +162,47 @@ input:focus::placeholder, textarea:focus::placeholder { opacity: 0; }
 textarea { resize: vertical; min-height: 60px; }
 
 .app-wrapper { display: flex; flex-direction: column; min-height: 100vh; }
-.content-pusher { padding-top: var(--header-height); flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; }
+.content-pusher { padding-top: var(--header-height); flex-grow: 1; display: flex; flex-direction: column; overflow: auto; }
 
 .main-container {
-  padding: 1.5rem; 
+  padding: 0.5rem 1rem 1rem 1rem; /* Reduced top padding to ensure immediate visibility */
   display: flex;
-  gap: 1.5rem; 
+  flex-direction: column; /* Stack vertically instead of side-by-side */
+  gap: 1rem; /* Reduced from 1.5rem to 1rem */
   flex-grow: 1; 
   box-sizing: border-box;
-  overflow: hidden; 
+  overflow: visible; 
 }
-.main-container.output-expanded .left-side {
-  flex-basis: 30%;
-  /* On smaller screens, hide left side when output is expanded */
-}
-.main-container.output-expanded .right-side {
-  flex-basis: 70%;
-}
+/* Output expanded styles removed - using full width layout by default */
 
-@media (max-width: 1024px) { /* Tablet and below */
-    .main-container.output-expanded .left-side {
-        display: none; /* Hide left side completely */
-    }
-    .main-container.output-expanded .right-side {
-        flex-basis: 100%;
-    }
-}
 @media (max-width: 768px) { /* Mobile */
-  .main-container { flex-direction: column; padding: 1rem; gap: 1rem; overflow: auto; }
-  .main-container.output-expanded .left-side { display: flex; flex-basis: auto; } /* Re-show if it was hidden by tablet rule */
-  .main-container.output-expanded .right-side { flex-basis: auto; }
+  .left-side { 
+    flex-direction: column; /* Stack input and video vertically on mobile */
+  }
+  .video-container {
+    max-width: none; /* Remove max-width constraint on mobile */
+  }
 }
 
 .left-side {
-  flex-basis: 40%; /* Default width */
-  height: 100%; 
+  flex-shrink: 0; /* Don't shrink the input section */
+  width: 100%; /* Full width in vertical layout */
   display: flex;
-  flex-direction: column;
-  align-items: center;
+  flex-direction: row; /* Horizontal layout for input and video */
+  align-items: flex-start; /* Align items to top */
   gap: 1rem;
-  overflow-y: auto; 
-  scrollbar-width: none; 
-  -ms-overflow-style: none; 
-  padding-right: 0.5rem; 
-  transition: flex-basis 0.3s ease-in-out;
+  overflow: visible; /* No need to scroll in this section */
+  padding: 0;
+  margin-top: 0; /* Ensure no extra margin pushes content down */
 }
 .left-side::-webkit-scrollbar { display: none; }
 
-@media (max-width: 768px) {
-  .left-side { width: 100%; height: auto; overflow: visible; padding-right: 0; flex-basis: auto; }
-}
+/* Mobile styles for left-side handled above */
 
-.input-section { width: 100%; margin-bottom: 1rem; }
+.input-section { flex: 1; min-width: 300px; margin-bottom: 0; }
 .input-container { width: 100%; margin-bottom: 0.75rem; }
 /* .input-container-topic { margin-top: 0.5rem; } REMOVED as merged */
-.input-label { display: block; margin-bottom: 0.25rem; font-size: 0.9rem; }
+.input-label { display: block; margin-bottom: 0.25rem; font-size: 0.9rem; margin-top: 0; }
 /* .youtube-input, .topic-input { width: 100%; } REMOVED, new class below */
 .content-input { /* Style for the new combined textarea */
   width: 100%;
@@ -232,6 +218,10 @@ textarea { resize: vertical; min-height: 60px; }
   border: 1px solid light-dark(#e0e0e0, #444);
   border-radius: 4px;
   background-color: light-dark(#f9f9f9, #2e2e32);
+}
+
+.video-container .educational-materials-request {
+  margin-top: 0; /* Remove top margin when inside video container */
 }
 .educational-materials-request h4 {
   font-size: 0.95rem;
@@ -258,14 +248,18 @@ textarea { resize: vertical; min-height: 60px; }
 .submit-button { flex: 1; }
 
 .video-container { 
-  width: 100%; 
+  flex: 1; 
+  min-width: 280px; 
+  max-width: 400px; 
   aspect-ratio: 16 / 9; 
   background-color: var(--color-video-container-background); 
   border-radius: 8px; 
   display: flex; 
-  align-items: center; 
+  align-items: flex-start; /* Align to top instead of center */
   justify-content: center; 
   overflow: hidden; 
+  padding: 1rem; /* Add padding for checkboxes */
+  box-sizing: border-box;
 }
 .video-iframe { 
   width: 100%; 
@@ -283,11 +277,11 @@ textarea { resize: vertical; min-height: 60px; }
 .right-side {
   display: flex;
   flex-direction: column;
-  flex-basis: 60%; /* Default width */
+  flex-grow: 1; /* Take up remaining space */
+  width: 100%; /* Full width */
   gap: 1rem;
-  height: 100%; 
   overflow: hidden; 
-  transition: flex-basis 0.3s ease-in-out;
+  min-height: 0; /* Allow shrinking */
 }
 @media (max-width: 768px) {
   .right-side { height: auto; min-height: 60vh; flex-basis: auto; }
@@ -311,15 +305,13 @@ textarea { resize: vertical; min-height: 60px; }
   flex: 1; 
   display: flex;
   flex-direction: column;
-  min-height: 300px; 
+  min-height: 40vh; /* Reduced from 60vh to 40vh */
   overflow: hidden; 
 }
-.main-container.output-expanded .content-area {
-   /* Potentially adjust min-height or other properties if needed */
-}
+/* Output expanded content area styles removed - using full width by default */
 
 @media (max-width: 768px) {
-  .content-area { max-height: none; min-height: 550px; }
+  .content-area { max-height: none; min-height: 350px; }
 }
 
 .content-placeholder { 
@@ -329,7 +321,7 @@ textarea { resize: vertical; min-height: 60px; }
   align-items: center; 
   justify-content: center; 
   text-align: center;
-  padding: 2rem;
+  padding: 1rem;
   flex: 1; 
   border-radius: 8px; 
   font-size: 1.1rem;
@@ -353,9 +345,7 @@ textarea { resize: vertical; min-height: 60px; }
   box-shadow: 0 2px 5px rgba(0,0,0,0.05);
   flex-shrink: 0; /* Prevent shrinking when content area grows */
 }
-.main-container.output-expanded .llm-log-panel {
-    max-height: 400px; /* Allow more height when output is expanded */
-}
+/* Output expanded LLM log panel styles removed - using full width by default */
 .llm-log-header { 
   display: flex; 
   justify-content: space-between; 
@@ -409,7 +399,7 @@ textarea { resize: vertical; min-height: 60px; }
   font-family: var(--font-technical);
   font-size: 0.75rem;
 }
-.token-entry { color: var(--color-subtitle); display: inline; }
+.token-entry { color: var(--color-subtitle); display: block; white-space: pre-wrap; }
 .log-entry-data .error-stack { font-size: 0.7rem; opacity: 0.8; margin-top: 0.3rem; }
 .log-entry-data strong { font-weight: 500; display: block; margin-bottom: 0.2rem; }
 .grounding-metadata-log { margin-top: 0.5rem; font-size: 0.75rem;}

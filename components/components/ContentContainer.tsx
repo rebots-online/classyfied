@@ -37,7 +37,6 @@ interface ContentContainerProps {
   onLoadingStateChange?: (isLoading: boolean) => void;
   onLlmInteraction: (interaction: TextGenerationInteraction) => void;
   requestedMaterials: EducationalMaterialRequest;
-  isOutputExpanded: boolean;
 }
 
 type LoadingState = 
@@ -66,7 +65,6 @@ export default forwardRef(function ContentContainer(
     onLoadingStateChange,
     onLlmInteraction,
     requestedMaterials,
-    isOutputExpanded,
   }: ContentContainerProps,
   ref,
 ) {
@@ -91,6 +89,38 @@ export default forwardRef(function ContentContainer(
   const [showEmbedModal, setShowEmbedModal] = useState(false);
   const [showDeployModal, setShowDeployModal] = useState(false); 
 
+  // New states for model selection
+  const [selectedModel, setSelectedModel] = useState<string>(localStorage.getItem('selectedModel') || 'moonshotai/kimi-k2:free');
+  const [apiKey, setApiKey] = useState<string>(localStorage.getItem('apiKey') || process.env.OPENROUTER_API_KEY || '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');
+  const [provider, setProvider] = useState<string>(localStorage.getItem('provider') || 'openrouter');
+
+  const models = [
+    'xai/grok-4',
+    'moonshotai/kimi-k2:free',
+    'moonshotai/kimi-k2',
+    'anthropic/claude-opus-4',
+    'minimax/minimax-m1',
+    'google/gemini-2.5-pro',
+    'google/gemini-2.5-flash-lite-preview-06-17'
+  ];
+
+
+  useEffect(() => {
+    localStorage.setItem('apiKey', apiKey);
+    localStorage.setItem('selectedModel', selectedModel);
+    localStorage.setItem('provider', provider);
+  }, [apiKey, selectedModel, provider]);
+
+
+
+
+
+
+
+
+
+
+
 
   useImperativeHandle(ref, () => ({
     getSpec: () => spec,
@@ -103,7 +133,7 @@ export default forwardRef(function ContentContainer(
       setLoadingMessage('Generating lesson plan...');
       try {
         const { text } = await generateText({
-          modelName: 'moonshotai/kimi-k2:free',
+          modelName: selectedModel, provider, apiKey,
           basePrompt: LESSON_PLAN_PROMPT_TEMPLATE.replace('[APP_SPECIFICATION_HERE]', currentSpec),
           safetySettings: defaultSafetySettings,
           onInteraction: onLlmInteraction,
@@ -120,7 +150,7 @@ export default forwardRef(function ContentContainer(
       setLoadingMessage('Generating student handout...');
       try {
         const { text } = await generateText({
-          modelName: 'moonshotai/kimi-k2:free',
+          modelName: selectedModel, provider, apiKey,
           basePrompt: HANDOUT_PROMPT_TEMPLATE.replace('[APP_SPECIFICATION_HERE]', currentSpec),
           safetySettings: defaultSafetySettings,
           onInteraction: onLlmInteraction,
@@ -137,7 +167,7 @@ export default forwardRef(function ContentContainer(
       setLoadingMessage('Generating review quiz...');
       try {
         const { text } = await generateText({
-          modelName: 'moonshotai/kimi-k2:free',
+          modelName: selectedModel, provider, apiKey,
           basePrompt: QUIZ_PROMPT_TEMPLATE.replace('[APP_SPECIFICATION_HERE]', currentSpec),
           safetySettings: defaultSafetySettings,
           responseMimeType: "application/json",
@@ -151,7 +181,7 @@ export default forwardRef(function ContentContainer(
         setQuiz({ error: `Error generating quiz: ${err instanceof Error ? err.message : 'Unknown error'}` });
       }
     }
-  }, [requestedMaterials, onLlmInteraction]);
+  }, [requestedMaterials, onLlmInteraction, selectedModel, provider, apiKey]);
 
 
   const generateSpecAndCode = useCallback(async (videoUrl?: string, topicOrDetails?: string): Promise<{generatedSpec: string, generatedCode: string, searchResults?: GroundingMetadata}> => {
@@ -159,7 +189,7 @@ export default forwardRef(function ContentContainer(
     setLoadingMessage('Generating app spec & code...');
     if (videoUrl) {
       specResponse = await generateText({
-        modelName: 'moonshotai/kimi-k2:free',
+        modelName: selectedModel, provider, apiKey,
         basePrompt: SPEC_FROM_VIDEO_PROMPT,
         additionalUserText: topicOrDetails ? `User-provided details to consider: ${topicOrDetails}` : undefined,
         videoUrl: videoUrl,
@@ -170,7 +200,7 @@ export default forwardRef(function ContentContainer(
       });
     } else if (topicOrDetails) {
       specResponse = await generateText({
-        modelName: 'moonshotai/kimi-k2:free',
+        modelName: selectedModel, provider, apiKey,
         basePrompt: SPEC_FROM_TOPIC_PROMPT_TEMPLATE.replace('[USER_TOPIC_HERE]', topicOrDetails),
         safetySettings: defaultSafetySettings,
         useGoogleSearch: true,
@@ -192,7 +222,7 @@ export default forwardRef(function ContentContainer(
     
     setLoadingMessage('Generating app code from spec...');
     const { text: codeResponseText } = await generateText({
-      modelName: 'moonshotai/kimi-k2:free',
+      modelName: selectedModel, provider, apiKey,
       basePrompt: generatedSpecText,
       safetySettings: defaultSafetySettings,
       onInteraction: onLlmInteraction,
@@ -201,12 +231,12 @@ export default forwardRef(function ContentContainer(
     const generatedCode = parseHTML(codeResponseText);
 
     return { generatedSpec: generatedSpecText, generatedCode, searchResults: specResponse.groundingMetadata };
-  }, [onLlmInteraction]);
+  }, [onLlmInteraction, selectedModel, provider, apiKey]);
   
   const regenerateCodeFromSpec = useCallback(async (currentSpec: string): Promise<string> => {
     setLoadingMessage('Regenerating code from spec...');
     const { text: codeResponseText } = await generateText({
-      modelName: 'moonshotai/kimi-k2:free',
+      modelName: selectedModel, provider, apiKey,
       basePrompt: currentSpec,
       safetySettings: defaultSafetySettings,
       onInteraction: onLlmInteraction,
@@ -214,7 +244,7 @@ export default forwardRef(function ContentContainer(
     });
     const generatedCode = parseHTML(codeResponseText);
     return generatedCode;
-  }, [onLlmInteraction]);
+  }, [onLlmInteraction, selectedModel, provider, apiKey]);
 
 
   useEffect(() => {
@@ -233,7 +263,7 @@ export default forwardRef(function ContentContainer(
       if (!videoUrl && !topicOrDetails) {
          // This case should ideally be handled by App.tsx before rendering ContentContainer
          // but as a fallback:
-         setError("No video URL or topic provided.");
+          
          setLoadingState('error');
          setActiveTabIndex(0); // Default to spec tab on error
          return;
@@ -276,7 +306,7 @@ export default forwardRef(function ContentContainer(
         setLessonPlan(null); setHandout(null); setQuiz(null);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contentBasisInput, generateSpecAndCode, generateEducationalMaterials]); // preSeeded props removed from dependencies
+  }, [contentBasisInput, generateSpecAndCode, generateEducationalMaterials, selectedModel, provider, apiKey]); // preSeeded props removed from dependencies
 
   useEffect(() => {
     if (code) setIframeKey((prev) => prev + 1);
@@ -351,7 +381,7 @@ export default forwardRef(function ContentContainer(
       setActiveTabIndex(0); 
 
       const { text: refinedSpecJson } = await generateText({
-        modelName: 'moonshotai/kimi-k2:free',
+        modelName: selectedModel, provider, apiKey,
         basePrompt: REFINE_SPEC_PROMPT_TEMPLATE.replace('[EXISTING_SPEC_HERE]', spec).replace('[USER_REFINEMENT_INSTRUCTIONS_HERE]', refinementInstructions),
         safetySettings: defaultSafetySettings,
         responseMimeType: "application/json",
@@ -564,6 +594,29 @@ export default forwardRef(function ContentContainer(
           <button onClick={handleLoadProject} className="button-secondary action-button">
             <span className="material-symbols-outlined">folder_open</span> Load Project
           </button>
+
+{/* Model selection controls hidden - using default kimi-k2:free */}
+{/* <div className="model-selection-bar">
+  <label>Model:</label>
+  <select value={selectedModel} onChange={(e) => setSelectedModel(e.target.value)}>
+    {models.map((model) => (
+      <option key={model} value={model}>{model}</option>
+    ))}
+  </select>
+  <label>Provider:</label>
+  <select value={provider} onChange={(e) => setProvider(e.target.value)}>
+    <option value="openrouter">OpenRouter</option>
+    <option value="native">Native</option>
+  </select>
+  <label>API Key:</label>
+  <input
+    type="text"
+    value={apiKey}
+    onChange={(e) => setApiKey(e.target.value)}
+    placeholder="Enter API Key"
+  />
+</div> */}
+
       </div>
 
       <Tabs
