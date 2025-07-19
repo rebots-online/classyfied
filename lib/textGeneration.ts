@@ -1,27 +1,12 @@
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
-*/
+ */
 /* tslint:disable */
-
-import {
-  FinishReason,
-  GenerateContentConfig,
-  GenerateContentParameters, // Corrected import
-  GenerateContentResponse, // Corrected import
-  GoogleGenAI,
-  HarmBlockThreshold,
-  HarmCategory,
-  Part,
-  SafetySetting,
-  GroundingMetadata, 
-} from '@google/genai';
-
-const GEMINI_API_KEY = process.env.API_KEY;
 
 export interface TextGenerationInteraction {
   type: 'PROMPT' | 'RESPONSE' | 'ERROR' | 'TOKEN';
-  data: any; // Raw request for PROMPT, GenerateContentResponse for RESPONSE, Error for ERROR, or string token for TOKEN
+  data: any; // Raw request for PROMPT, OpenRouter API response for RESPONSE, Error for ERROR, or string token for TOKEN
   modelName?: string;
 }
 
@@ -31,24 +16,28 @@ export interface GenerateTextOptions {
   videoUrl?: string;
   additionalUserText?: string;
   temperature?: number;
-  safetySettings?: SafetySetting[];
-  responseMimeType?: string;
-  useGoogleSearch?: boolean;
+  maxTokens?: number;
   stream?: boolean;
-  onInteraction?: (interaction: TextGenerationInteraction) => void; // Added callback
+  onInteraction?: (interaction: TextGenerationInteraction) => void;
   onToken?: (token: string) => void;
 }
 
-export interface TextGenerationResponse { // This remains for the function's return type
+export interface TextGenerationResponse {
   text: string;
-  groundingMetadata?: GroundingMetadata;
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
 }
 
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+
 /**
- * Generate text content using the Gemini API.
+ * Generate text content using the OpenRouter API.
  *
  * @param options - Configuration options for the generation request.
- * @returns The response text and optional grounding metadata from the Gemini API.
+ * @returns The response text from the OpenRouter API.
  */
 export async function generateText(
   options: GenerateTextOptions,
@@ -56,153 +45,123 @@ export async function generateText(
   const {
     modelName,
     basePrompt,
-    videoUrl,
     additionalUserText,
     temperature = 0.75,
-    safetySettings,
-    responseMimeType,
-    useGoogleSearch = false,
+    maxTokens,
     stream = false,
-    onInteraction, // Destructure callback
+    onInteraction,
     onToken,
   } = options;
 
-  if (!GEMINI_API_KEY) {
-    const error = new Error('Gemini API key is missing or empty');
+  if (!OPENROUTER_API_KEY) {
+    const error = new Error('OpenRouter API key is missing or empty');
     if (onInteraction) {
       onInteraction({type: 'ERROR', data: error, modelName});
     }
     throw error;
   }
 
-  const ai = new GoogleGenAI({apiKey: GEMINI_API_KEY});
+  const prompt = additionalUserText ? `${basePrompt}\n\n${additionalUserText}` : basePrompt;
 
-  const parts: Part[] = [{text: basePrompt}];
-
-  if (additionalUserText) {
-    parts.push({text: additionalUserText});
-  }
-
-  if (videoUrl) {
-    try {
-      parts.push({
-        fileData: {
-          mimeType: 'video/mp4', 
-          fileUri: videoUrl,
-        },
-      });
-    } catch (error) {
-      console.error('Error processing video input:', error);
-      const err = new Error(`Failed to process video input from URL: ${videoUrl}`);
-      if (onInteraction) {
-        onInteraction({type: 'ERROR', data: err, modelName});
-      }
-      throw err;
-    }
-  }
-  
-  const baseConfig: GenerateContentConfig = {
-    temperature,
-  };
-
-  if (!useGoogleSearch && responseMimeType) {
-    baseConfig.responseMimeType = responseMimeType;
-  }
-  
-  if (safetySettings) {
-    baseConfig.safetySettings = safetySettings;
-  }
-
-  if (useGoogleSearch) {
-    baseConfig.tools = [{googleSearch: {}}];
-  }
-  
-  const request: GenerateContentParameters = { 
+  const requestBody = {
     model: modelName,
-    contents: [{role: 'user', parts}],
-    config: baseConfig,
+    messages: [
+      {
+        role: 'user',
+        content: prompt
+      }
+    ],
+    temperature,
+    ...(maxTokens && { max_tokens: maxTokens }),
+    stream,
   };
-
 
   if (onInteraction) {
-    onInteraction({type: 'PROMPT', data: request, modelName});
+    onInteraction({type: 'PROMPT', data: requestBody, modelName});
   }
 
   try {
-    let genAiResponse: GenerateContentResponse | undefined;
-    let collectedText = '';
-    if (stream || onToken) {
-      const streamResp = await ai.models.generateContentStream(request);
-      for await (const chunk of streamResp) {
-        const token = chunk.text || '';
-        collectedText += token;
-        genAiResponse = chunk;
-        if (onToken) onToken(token);
-        if (onInteraction) {
-          onInteraction({type: 'TOKEN', data: token, modelName});
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': window.location.href,
+        'X-Title': 'Classified App',
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      throw new Error(`OpenRouter API error: ${response.status} ${response.statusText}`);
+    }
+
+    let result: TextGenerationResponse;
+
+    if (stream && onToken) {
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('Failed to get response reader for streaming');
+      }
+
+      let fullText = '';
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = new TextDecoder().decode(value);
+        const lines = chunk.split('\n').filter(line => line.trim() !== '');
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            if (data === '[DONE]') continue;
+            
+            try {
+              const parsed = JSON.parse(data);
+              const token = parsed.choices?.[0]?.delta?.content || '';
+              if (token) {
+                fullText += token;
+                onToken(token);
+                if (onInteraction) {
+                  onInteraction({type: 'TOKEN', data: token, modelName});
+                }
+              }
+            } catch (e) {
+              console.error('Error parsing stream chunk:', e);
+            }
+          }
         }
       }
-      if (!genAiResponse) {
-        throw new Error('No response received from streaming');
-      }
-      // Overwrite text with collected text for convenience
-      (genAiResponse as any).text = collectedText;
+      
+      result = { text: fullText };
     } else {
-      genAiResponse = await ai.models.generateContent(request);
+      const responseData = await response.json();
+      
+      result = {
+        text: responseData.choices?.[0]?.message?.content || '',
+        usage: responseData.usage,
+      };
     }
 
     if (onInteraction) {
-      onInteraction({type: 'RESPONSE', data: genAiResponse, modelName});
+      onInteraction({type: 'RESPONSE', data: result, modelName});
     }
 
-    if (genAiResponse.promptFeedback?.blockReason) {
-      throw new Error(
-        `Content generation failed: Prompt blocked (reason: ${genAiResponse.promptFeedback.blockReason})`,
-      );
+    if (!result.text) {
+      throw new Error('Content generation failed: No text returned from OpenRouter');
     }
 
-    if (!genAiResponse.candidates || genAiResponse.candidates.length === 0) {
-      if (genAiResponse.promptFeedback?.blockReason) {
-         throw new Error(
-          `Content generation failed: No candidates returned. Prompt feedback: ${genAiResponse.promptFeedback.blockReason}`,
-        );
-      }
-      throw new Error('Content generation failed: No candidates returned.');
-    }
-
-    const firstCandidate = genAiResponse.candidates[0];
-
-    if (
-      firstCandidate.finishReason &&
-      firstCandidate.finishReason !== FinishReason.STOP
-    ) {
-      if (firstCandidate.finishReason === FinishReason.SAFETY) {
-        console.error('Safety ratings:', firstCandidate.safetyRatings);
-        throw new Error(
-          'Content generation failed: Response blocked due to safety settings.',
-        );
-      } else {
-        throw new Error(
-          `Content generation failed: Stopped due to ${firstCandidate.finishReason}.`,
-        );
-      }
-    }
-    
-    return {
-        text: genAiResponse.text, 
-        groundingMetadata: firstCandidate.groundingMetadata,
-    };
+    return result;
 
   } catch (error) {
     console.error(
-      'An error occurred during Gemini API call or response processing:',
+      'An error occurred during OpenRouter API call or response processing:',
       error,
     );
     if (onInteraction) {
       onInteraction({type: 'ERROR', data: error, modelName});
-    }
-     if (error instanceof Error && error.message.includes("application/json") && error.message.includes("tool")) {
-        throw new Error(`API Error: ${error.message}. Note: JSON response type is not supported with Google Search tool.`);
     }
     throw error;
   }
