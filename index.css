@@ -165,10 +165,10 @@ textarea { resize: vertical; min-height: 60px; }
 .content-pusher { padding-top: var(--header-height); flex-grow: 1; display: flex; flex-direction: column; overflow: auto; }
 
 .main-container {
-  padding: 0.5rem 1rem 1rem 1rem; /* Reduced top padding to ensure immediate visibility */
+  padding: 0.25rem 1rem 0.5rem 1rem; /* Further reduced padding */
   display: flex;
   flex-direction: column; /* Stack vertically instead of side-by-side */
-  gap: 1rem; /* Reduced from 1.5rem to 1rem */
+  gap: 0.5rem; /* Reduced from 1rem to 0.5rem */
   flex-grow: 1; 
   box-sizing: border-box;
   overflow: visible; 
@@ -279,7 +279,7 @@ textarea { resize: vertical; min-height: 60px; }
   flex-direction: column;
   flex-grow: 1; /* Take up remaining space */
   width: 100%; /* Full width */
-  gap: 1rem;
+  gap: 0.5rem;
   overflow: hidden; 
   min-height: 0; /* Allow shrinking */
 }
@@ -305,13 +305,13 @@ textarea { resize: vertical; min-height: 60px; }
   flex: 1; 
   display: flex;
   flex-direction: column;
-  min-height: 40vh; /* Reduced from 60vh to 40vh */
+  min-height: 20vh; /* Further reduced for bookmark bar + GNOME dock */
   overflow: hidden; 
 }
 /* Output expanded content area styles removed - using full width by default */
 
 @media (max-width: 768px) {
-  .content-area { max-height: none; min-height: 350px; }
+  .content-area { max-height: none; min-height: 250px; }
 }
 
 .content-placeholder { 
